@@ -1,0 +1,9 @@
+extends: spectral:oas
+rules:
+  has-summary:
+    description: Every operation needs a summary.
+    given: $.paths[*][get,put,post,delete]
+    severity: error
+    then:
+      field: summary
+      function: truthy
