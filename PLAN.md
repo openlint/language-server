@@ -40,6 +40,8 @@ Extension v2 becomes a client of this server. The extension's features must surv
 
 The server imports `getRuleset` and `getResolver` from `openlint/dist/services/...`, which aren't public API and can change in any release, so it pins an exact version. Ask the toolbox to export a supported "load a ruleset" function, which the extension's loader could use too. That's the first request to take to openlint/openlint.
 
+Pin every `@openlint/*` package exactly, and regenerate the lockfile on each engine update. The CLI depends on its own packages with `0.x` ranges, so an old lockfile can keep a stale package that still satisfies them: updating to `openlint` 1.3.0 over the 1.0.0 lockfile kept `@openlint/openlint-ruleset-migrator` 0.0.1, which doesn't know the `openlint:*` names, and `extends: openlint:openapi` failed in the CLI itself.
+
 ## Not in scope
 
 Navigation, rename and hover for OpenAPI. Other servers already do those well, and editors can run them alongside this one. If another engine passes the conformance suite, it qualifies for diagnostics too.

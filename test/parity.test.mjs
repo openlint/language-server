@@ -8,11 +8,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixture = join(here, 'fixture');
-const file = join(fixture, 'openapi.yaml');
 const cli = createRequire(import.meta.url).resolve('openlint/dist/index.js');
 
-function cliResults() {
+function cliResults(fixture) {
   let out;
   try {
     out = execFileSync(process.execPath, [cli, 'lint', '-f', 'json', 'openapi.yaml'], { cwd: fixture, encoding: 'utf8' });
@@ -22,7 +20,8 @@ function cliResults() {
   return JSON.parse(out);
 }
 
-function serverDiagnostics() {
+function serverDiagnostics(fixture) {
+  const file = join(fixture, 'openapi.yaml');
   return new Promise((resolve, reject) => {
     const server = spawn(process.execPath, [join(here, '../bin/openlint-language-server.js'), '--stdio'], { cwd: '/' });
     const timer = setTimeout(() => { server.kill(); reject(new Error('no diagnostics within 60s')); }, 60000);
@@ -58,18 +57,22 @@ function serverDiagnostics() {
 
 const key = r => `${r.code}|${r.severity}|${r.message}|${r.range.start.line}:${r.range.start.character}-${r.range.end.line}:${r.range.end.character}`;
 
-test('the server reports exactly what the CLI reports', async () => {
-  const expected = cliResults();
-  const actual = await serverDiagnostics();
-  assert.ok(expected.length >= 3, 'the fixture should produce findings');
-  assert.deepEqual(
-    actual.map(d => key({ ...d, severity: d.severity - 1 })).sort(),
-    expected.map(key).sort(),
-  );
-});
+// spectral:oas (frozen) and openlint:openapi (evolving) resolve through different packages since 1.2.
+for (const [name, dir] of [['spectral:oas', 'fixture'], ['openlint:openapi', 'fixture-openlint']]) {
+  test(`the server reports exactly what the CLI reports (${name})`, async () => {
+    const fixture = join(here, dir);
+    const expected = cliResults(fixture);
+    const actual = await serverDiagnostics(fixture);
+    assert.ok(expected.length >= 3, 'the fixture should produce findings');
+    assert.deepEqual(
+      actual.map(d => key({ ...d, severity: d.severity - 1 })).sort(),
+      expected.map(key).sort(),
+    );
+  });
+}
 
 test('built-in rules link to the registry, custom rules do not', async () => {
-  const actual = await serverDiagnostics();
+  const actual = await serverDiagnostics(join(here, 'fixture'));
   const by = code => actual.find(d => d.code === code);
   assert.equal(by('info-contact').codeDescription.href, 'https://rules.openlint.org/info-contact/');
   assert.equal(by('has-summary').codeDescription, undefined);
